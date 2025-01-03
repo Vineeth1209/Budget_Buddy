@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "432180981683",
+    "project_id": "budgetbuddy-8cb3b",
+    "storage_bucket": "budgetbuddy-8cb3b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:432180981683:android:bfdf27fb9609cce02ae5c6",
+        "android_client_info": {
+          "package_name": "com.example.budgetbuddy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "432180981683-mvubvf4bmtqtck6hslknog209v07okhj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.budgetbuddy",
+            "certificate_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+          }
+        },
+        {
+          "client_id": "432180981683-kdsh5g3v24i7o2bbitvf0vqh17j3g5t0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEFbkDUu1xz_5UrWdVTNvQpT4e4iDbKks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "432180981683-kdsh5g3v24i7o2bbitvf0vqh17j3g5t0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
