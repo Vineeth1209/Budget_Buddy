@@ -41,6 +41,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.tasks.Task
+import com.google.firebase.firestore.FirebaseFirestore
 
 class SignUpActivity : ComponentActivity() {
 
@@ -70,7 +71,8 @@ class SignUpActivity : ComponentActivity() {
 
     // Function to check network availability
     fun isNetworkAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork
         val capabilities = connectivityManager.getNetworkCapabilities(network)
         return capabilities != null && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -209,7 +211,13 @@ class SignUpActivity : ComponentActivity() {
                 Button(
                     onClick = {
                         isLoading = true
-                        signUpWithEmail(auth, email.text, password.text, confirmPassword.text, context) {
+                        signUpWithEmail(
+                            auth,
+                            email.text,
+                            password.text,
+                            confirmPassword.text,
+                            context
+                        ) {
                             isLoading = false
                         }
                     },
@@ -224,90 +232,72 @@ class SignUpActivity : ComponentActivity() {
                     enabled = !isLoading
                 ) {
                     if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
                     } else {
                         Text("Sign Up")
                     }
                 }
 
-                // Google Sign Up Button
-                Button(
-                    onClick = { signInWithGoogle() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4285F4), // Google blue
-                        contentColor = Color.Black
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Sign Up with Google",
-                            style = TextStyle(fontWeight = FontWeight.Bold)
-                        )
-                    }
-                }
+
             }
         }
     }
 
-    // Function to sign up using email
-    private fun signUpWithEmail(auth: FirebaseAuth, email: String, password: String, confirmPassword: String, context: Context, onComplete: () -> Unit) {
+    private fun signUpWithEmail(
+        auth: FirebaseAuth,
+        fullName: String,
+        email: String,
+        password: String,
+        confirmPassword: String,
+        context: Context,
+        onComplete: () -> Unit
+    ) {
         if (password.isNotEmpty() && password == confirmPassword) {
             auth.createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener { task ->
                     onComplete()
                     if (task.isSuccessful) {
-                        Toast.makeText(context, "Signup successful", Toast.LENGTH_SHORT).show()
-                        // TODO: Navigate to main chat screen or login
+                        val userId = auth.currentUser?.uid
+                        if (userId != null) {
+                            val user = hashMapOf(
+                                "fullName" to fullName,
+                                "email" to email
+                            )
+
+                            FirebaseFirestore.getInstance().collection("users").document(userId)
+                                .set(user)
+                                .addOnSuccessListener {
+                                    Toast.makeText(
+                                        context,
+                                        "Signup successful. User saved!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    // Navigate to HomeActivity
+                                    val intent = Intent(context, HomeActivity::class.java)
+                                    context.startActivity(intent)
+                                }
+                                .addOnFailureListener {
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to save user: ${it.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                        }
                     } else {
-                        Toast.makeText(context, "Signup failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            "Signup failed: ${task.exception?.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
         } else {
             Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
             onComplete()
         }
-    }
-
-    // Function to handle Google Sign In
-    private fun signInWithGoogle() {
-        val signInIntent: Intent = googleSignInClient.signInIntent
-        startActivityForResult(signInIntent, RC_SIGN_IN)
-    }
-
-    // Handle Google Sign-In Result
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == RC_SIGN_IN) {
-            val task: Task<GoogleSignInAccount> = GoogleSignIn.getSignedInAccountFromIntent(data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                if (account != null) {
-                    firebaseAuthWithGoogle(account.idToken!!)
-                }
-            } catch (e: ApiException) {
-                Log.w("SignUpActivity", "Google sign in failed", e)
-                Toast.makeText(this, "Google sign-in failed", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun firebaseAuthWithGoogle(idToken: String) {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        auth.signInWithCredential(credential)
-            .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful) {
-                    Toast.makeText(this, "Google sign-in successful", Toast.LENGTH_SHORT).show()
-                    // TODO: Navigate to main chat screen
-                } else {
-                    Toast.makeText(this, "Google sign-in failed", Toast.LENGTH_SHORT).show()
-                }
-            }
     }
 }

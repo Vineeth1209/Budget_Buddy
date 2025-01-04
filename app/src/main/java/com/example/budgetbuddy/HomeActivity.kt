@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,11 +18,18 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import com.example.budgetbuddy.database.Budget
 import com.example.budgetbuddy.ui.theme.BudgetBuddyTheme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -32,11 +40,29 @@ class HomeActivity : ComponentActivity() {
         ViewModelProvider.AndroidViewModelFactory(application)
     }
 
+    private var userFullName by mutableStateOf("")
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Fetch user full name from Firestore
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            FirebaseFirestore.getInstance().collection("users").document(userId)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.contains("fullName")) {
+                        userFullName = document.getString("fullName") ?: "User"
+                    }
+                }
+                .addOnFailureListener {
+                    Toast.makeText(this, "Failed to fetch user details", Toast.LENGTH_SHORT).show()
+                }
+        }
+
         setContent {
             BudgetBuddyTheme {
-                HomeScreen(expenseViewModel, budgetViewModel)  // Ensure this call matches the function signature
+                HomeScreen(expenseViewModel, budgetViewModel, userFullName)
             }
         }
     }
@@ -44,12 +70,18 @@ class HomeActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(expenseViewModel: ExpenseViewModel, budgetViewModel: BudgetViewModel) {
+fun HomeScreen(expenseViewModel: ExpenseViewModel, budgetViewModel: BudgetViewModel, userFullName: String) {
     var selectedTab by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Budget Buddy") })
+            TopAppBar(title = {
+                Text(
+                    "Budget Buddy",
+                    fontWeight = FontWeight.Bold,
+                    fontStyle = FontStyle.Italic
+                )
+            })
         },
         bottomBar = {
             BottomNavigationBar(
@@ -60,100 +92,145 @@ fun HomeScreen(expenseViewModel: ExpenseViewModel, budgetViewModel: BudgetViewMo
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedTab) {
-                0 -> SummaryScreen(expenseViewModel, budgetViewModel) // Updated to SummaryScreen
+                0 -> SummaryScreen(expenseViewModel, budgetViewModel, userFullName)
                 1 -> ExpensesScreen(expenseViewModel)
                 2 -> BudgetScreen(budgetViewModel)
-                3 -> ProfileScreen()
+                3 -> ProfileScreen(userFullName)
             }
         }
     }
 }
 
+
 @Composable
-fun SummaryScreen(expenseViewModel: ExpenseViewModel, budgetViewModel: BudgetViewModel) {
+fun SummaryScreen(expenseViewModel: ExpenseViewModel, budgetViewModel: BudgetViewModel, userFullName: String) {
     val context = LocalContext.current
     val expenses by expenseViewModel.expenses.collectAsState(initial = emptyList())
     val budgets by budgetViewModel.allBudgets.observeAsState(emptyList())
 
-    // State to manage dialog visibility
     var showDailyExpenseAlert by remember { mutableStateOf(false) }
     var showRemainingBudgetWarning by remember { mutableStateOf(false) }
     var alertChecked by remember { mutableStateOf(false) }
 
-    // Calculate summary values
     val totalExpenses = expenses.sumOf { it.amount }
     val totalBudget = budgets.lastOrNull()?.amount ?: 0.0
     val remainingBudget = totalBudget - totalExpenses
+    val budgetProgress = (totalExpenses / totalBudget).coerceIn(0.0, 1.0).toFloat()
 
-    // Check if daily expenses exceed £150 (only once)
-    val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-    val todayExpenses = expenses.filter { it.date.startsWith(today) }.sumOf { it.amount }
+    val currentDate = SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(Date())
+    val recentExpense = expenses.lastOrNull()?.let { "${it.name}: £${String.format("%.2f", it.amount)}" } ?: "No recent expenses"
+    val highestExpense = expenses.maxByOrNull { it.amount }?.let { "${it.name}: £${String.format("%.2f", it.amount)}" } ?: "No data"
 
     if (!alertChecked) {
-        if (todayExpenses > 150) {
-            showDailyExpenseAlert = true
-        }
-
-        // Check if remaining budget is below £10
-        if (remainingBudget < 10) {
-            showRemainingBudgetWarning = true
-        }
+        if (expenses.filter { it.date == currentDate }.sumOf { it.amount } > 150) showDailyExpenseAlert = true
+        if (remainingBudget < 10) showRemainingBudgetWarning = true
         alertChecked = true
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Summary", style = MaterialTheme.typography.titleLarge)
-        Spacer(modifier = Modifier.height(16.dp))
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
 
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            elevation = CardDefaults.cardElevation(4.dp)
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Total Budget: £${String.format("%.2f", totalBudget)}", style = MaterialTheme.typography.bodyLarge)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Total Expenses: £${String.format("%.2f", totalExpenses)}", style = MaterialTheme.typography.bodyLarge)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Remaining Budget: £${String.format("%.2f", remainingBudget)}", style = MaterialTheme.typography.bodyLarge)
+            Text("Hello, $userFullName!", style = MaterialTheme.typography.headlineMedium, color = Color.Black)
+            Text("Today is $currentDate", style = MaterialTheme.typography.bodyMedium, color = Color.Black)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                elevation = CardDefaults.cardElevation(8.dp),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Total Budget: £${String.format("%.2f", totalBudget)}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Total Expenses: £${String.format("%.2f", totalExpenses)}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Remaining Budget: £${String.format("%.2f", remainingBudget)}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LinearProgressIndicator(
+                        progress = budgetProgress,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp),
+                        color = if (budgetProgress < 0.5) Color.Green else Color.Red
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Recent Transactions Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                elevation = CardDefaults.cardElevation(6.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Recent Transaction", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(recentExpense, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Budget Insights Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                elevation = CardDefaults.cardElevation(6.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Budget Insights", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Highest Expense: $highestExpense", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
 
-    // Daily expense alert dialog
     if (showDailyExpenseAlert) {
         AlertDialog(
             onDismissRequest = { showDailyExpenseAlert = false },
             confirmButton = {
-                Button(onClick = { showDailyExpenseAlert = false }) {
-                    Text("OK")
-                }
+                Button(onClick = { showDailyExpenseAlert = false }) { Text("OK") }
             },
             title = { Text("Daily Expense Alert") },
             text = { Text("Your daily expenses have exceeded £150!") }
         )
     }
 
-    // Remaining budget warning dialog
     if (showRemainingBudgetWarning) {
         AlertDialog(
             onDismissRequest = { showRemainingBudgetWarning = false },
             confirmButton = {
-                Button(onClick = { showRemainingBudgetWarning = false }) {
-                    Text("OK")
-                }
+                Button(onClick = { showRemainingBudgetWarning = false }) { Text("OK") }
             },
             title = { Text("Remaining Budget Warning") },
             text = { Text("Your remaining budget is below £10!") }
         )
     }
 }
+
+
 
 
 
@@ -332,7 +409,7 @@ fun ExpensesScreen(expenseViewModel: ExpenseViewModel) {
 
 
     @Composable
-    fun ProfileScreen() {
+    fun ProfileScreen(userFullName: String) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -342,7 +419,7 @@ fun ExpensesScreen(expenseViewModel: ExpenseViewModel) {
         ) {
             Text("Profile", style = MaterialTheme.typography.titleLarge)
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Name: Vineeth Kumar", style = MaterialTheme.typography.bodyLarge)
+            Text("Name: $userFullName", style = MaterialTheme.typography.bodyLarge)
             Spacer(modifier = Modifier.height(8.dp))
             Text("Student ID: S3117755", style = MaterialTheme.typography.bodyLarge)
             Spacer(modifier = Modifier.height(8.dp))
