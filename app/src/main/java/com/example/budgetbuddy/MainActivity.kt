@@ -1,10 +1,14 @@
 package com.example.budgetbuddy
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,9 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.budgetbuddy.ui.theme.BudgetBuddyTheme
 import kotlinx.coroutines.delay
 
@@ -28,12 +34,39 @@ class MainActivity : ComponentActivity() {
         setContent {
             BudgetBuddyTheme {
                 SplashScreen(onSplashComplete = {
-                    // Navigate to LoginActivity after the splash screen is complete
-                    startActivity(Intent(this, LoginActivity::class.java))
-                    finish() // Close MainActivity so it’s removed from the back stack
+                    requestCameraPermission()
                 })
             }
         }
+    }
+
+    private fun requestCameraPermission() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                navigateToConsentActivity()
+            }
+
+            else -> {
+                val cameraPermissionLauncher = registerForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    if (isGranted) {
+                        navigateToConsentActivity()
+                    } else {
+                        Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
+
+    private fun navigateToConsentActivity() {
+        startActivity(Intent(this, ConsentActivity::class.java))
+        finish()
     }
 }
 
@@ -41,9 +74,8 @@ class MainActivity : ComponentActivity() {
 fun SplashScreen(onSplashComplete: () -> Unit) {
     var isSplashVisible by remember { mutableStateOf(true) }
 
-    // Delay to keep splash screen visible for 3 seconds, then call onSplashComplete
     LaunchedEffect(Unit) {
-        delay(9000) // 3-second delay
+        delay(3000) // 3-second delay
         isSplashVisible = false
         onSplashComplete()
     }
@@ -55,38 +87,34 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
 
 @Composable
 fun SplashContent() {
-    // Load the background image from the drawable folder
     val background: Painter = painterResource(id = R.drawable.background)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(0.dp), // Remove any padding
+            .padding(0.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Set the background image with content scaling and full size
         Image(
             painter = background,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop // Crop the image to fill the screen
+            contentScale = ContentScale.Crop
         )
 
-        // Semi-transparent overlay to decrease contrast
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f)) // 40% opacity black overlay
+                .background(Color.Black.copy(alpha = 0.4f))
         )
 
-        // Logo Image
         Image(
-            painter = painterResource(id = R.drawable.logo), // Replace with your logo's resource ID
+            painter = painterResource(id = R.drawable.logo),
             contentDescription = "Logo",
             modifier = Modifier
-                .size(350.dp) // Set desired size for the logo
+                .size(350.dp)
                 .padding(bottom = 15.dp),
-            contentScale = ContentScale.Fit // Scale the logo proportionally
+            contentScale = ContentScale.Fit
         )
     }
 }

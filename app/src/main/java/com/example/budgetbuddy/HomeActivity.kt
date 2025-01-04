@@ -37,11 +37,14 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModelProvider
+import coil.compose.AsyncImage
 import com.example.budgetbuddy.database.Budget
 import com.example.budgetbuddy.ui.theme.BudgetBuddyTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -55,16 +58,15 @@ class HomeActivity : ComponentActivity() {
     private var userFullName by mutableStateOf("")
     private var capturedImageUri by mutableStateOf<Uri?>(null)
 
+    private lateinit var imageFileUri: Uri
+
     private val cameraLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                val imageUri = result.data?.data
-                if (imageUri != null) {
-                    capturedImageUri = imageUri
-                    Toast.makeText(this, "Image captured successfully", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Failed to capture image", Toast.LENGTH_SHORT).show()
-                }
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            if (success) {
+                capturedImageUri = imageFileUri
+                Toast.makeText(this, "Image captured successfully", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Failed to capture image", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -105,13 +107,24 @@ class HomeActivity : ComponentActivity() {
                 this,
                 Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED -> {
-                val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                cameraLauncher.launch(intent)
+                val imageFile = createImageFile()
+                imageFileUri = FileProvider.getUriForFile(
+                    this,
+                    "${applicationContext.packageName}.provider",
+                    imageFile
+                )
+                cameraLauncher.launch(imageFileUri)
             }
             else -> {
                 requestPermissions(arrayOf(Manifest.permission.CAMERA), 1001)
             }
         }
+    }
+
+    private fun createImageFile(): File {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir = getExternalFilesDir(null)
+        return File.createTempFile("JPEG_${timestamp}_", ".jpg", storageDir)
     }
 }
 
