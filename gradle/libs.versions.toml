@@ -3,6 +3,7 @@ activityComposeVersion = "1.9.3"
 agp = "8.7.2"
 androidxActivityCompose = "1.7.0"
 androidxMaterial3 = "1.0.0"
+coilCompose = "2.4.0"
 constraintlayoutVersion = "2.2.0"
 firebaseBom = "33.6.0"
 kotlin = "2.0.0"
@@ -51,6 +52,7 @@ androidx-room-coroutines = { module = "androidx.room:room-coroutines", version.r
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomVersion" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomVersion" }
 androidx-ui-v140 = { module = "androidx.compose.ui:ui", version.ref = "uiVersion" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics", version = "22.1.2" }
 firebase-auth-ktx = { module = "com.google.firebase:firebase-auth-ktx", version = "23.1.0" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }

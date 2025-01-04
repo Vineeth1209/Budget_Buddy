@@ -212,11 +212,12 @@ class SignUpActivity : ComponentActivity() {
                     onClick = {
                         isLoading = true
                         signUpWithEmail(
-                            auth,
-                            email.text,
-                            password.text,
-                            confirmPassword.text,
-                            context
+                            auth = FirebaseAuth.getInstance(), // Pass the FirebaseAuth instance
+                            fullName = fullName.text, // Pass fullName as text
+                            email = email.text,
+                            password = password.text,
+                            confirmPassword = confirmPassword.text,
+                            context = context
                         ) {
                             isLoading = false
                         }
@@ -240,11 +241,10 @@ class SignUpActivity : ComponentActivity() {
                         Text("Sign Up")
                     }
                 }
-
-
             }
         }
     }
+
 
     private fun signUpWithEmail(
         auth: FirebaseAuth,

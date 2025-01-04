@@ -80,6 +80,8 @@ dependencies {
     // For lifecycle-aware components (optional, depends on use case)
     implementation (libs.androidx.lifecycle.runtime.ktx.v261)
 
+    implementation (libs.coil.compose)
+
     val room_version = "2.6.1"
 
     implementation("androidx.room:room-runtime:$room_version")
