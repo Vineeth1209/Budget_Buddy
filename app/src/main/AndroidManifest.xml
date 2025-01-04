@@ -31,7 +31,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".HomeActivity" android:exported="true"/>
-        <activity android:name=".AddExpenseActivity" android:exported="true"/>
+
 
         <activity android:name=".ExpensesActivity" android:exported="true"/>
     </application>

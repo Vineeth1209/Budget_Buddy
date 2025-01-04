@@ -75,17 +75,30 @@ fun SummaryScreen(expenseViewModel: ExpenseViewModel, budgetViewModel: BudgetVie
     val expenses by expenseViewModel.expenses.collectAsState(initial = emptyList())
     val budgets by budgetViewModel.allBudgets.observeAsState(emptyList())
 
+    // State to manage dialog visibility
+    var showDailyExpenseAlert by remember { mutableStateOf(false) }
+    var showRemainingBudgetWarning by remember { mutableStateOf(false) }
+    var alertChecked by remember { mutableStateOf(false) }
+
     // Calculate summary values
     val totalExpenses = expenses.sumOf { it.amount }
     val totalBudget = budgets.lastOrNull()?.amount ?: 0.0
     val remainingBudget = totalBudget - totalExpenses
 
-    // Check if daily expenses exceed £150
+    // Check if daily expenses exceed £150 (only once)
     val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     val todayExpenses = expenses.filter { it.date.startsWith(today) }.sumOf { it.amount }
 
-    if (todayExpenses > 150) {
-        Toast.makeText(context, "Alert: Your daily expenses exceed £150!", Toast.LENGTH_LONG).show()
+    if (!alertChecked) {
+        if (todayExpenses > 150) {
+            showDailyExpenseAlert = true
+        }
+
+        // Check if remaining budget is below £10
+        if (remainingBudget < 10) {
+            showRemainingBudgetWarning = true
+        }
+        alertChecked = true
     }
 
     Column(
@@ -112,85 +125,117 @@ fun SummaryScreen(expenseViewModel: ExpenseViewModel, budgetViewModel: BudgetVie
             }
         }
     }
+
+    // Daily expense alert dialog
+    if (showDailyExpenseAlert) {
+        AlertDialog(
+            onDismissRequest = { showDailyExpenseAlert = false },
+            confirmButton = {
+                Button(onClick = { showDailyExpenseAlert = false }) {
+                    Text("OK")
+                }
+            },
+            title = { Text("Daily Expense Alert") },
+            text = { Text("Your daily expenses have exceeded £150!") }
+        )
+    }
+
+    // Remaining budget warning dialog
+    if (showRemainingBudgetWarning) {
+        AlertDialog(
+            onDismissRequest = { showRemainingBudgetWarning = false },
+            confirmButton = {
+                Button(onClick = { showRemainingBudgetWarning = false }) {
+                    Text("OK")
+                }
+            },
+            title = { Text("Remaining Budget Warning") },
+            text = { Text("Your remaining budget is below £10!") }
+        )
+    }
 }
 
 
 
+@Composable
+fun ExpensesScreen(expenseViewModel: ExpenseViewModel) {
+    val context = LocalContext.current
+    var expenseName by remember { mutableStateOf("") }
+    var expenseAmount by remember { mutableStateOf("") }
+    val expenses by expenseViewModel.expenses.collectAsState(initial = emptyList())
 
-    @Composable
-    fun ExpensesScreen(expenseViewModel: ExpenseViewModel) {
-        val context = LocalContext.current
-        var expenseName by remember { mutableStateOf("") }
-        var expenseAmount by remember { mutableStateOf("") }
-        val expenses by expenseViewModel.expenses.collectAsState(initial = emptyList())
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        TextField(
+            value = expenseName,
+            onValueChange = { expenseName = it },
+            label = { Text("Expense Name") },
+            modifier = Modifier.fillMaxWidth()
+        )
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            TextField(
-                value = expenseName,
-                onValueChange = { expenseName = it },
-                label = { Text("Expense Name") },
-                modifier = Modifier.fillMaxWidth()
-            )
+        Spacer(modifier = Modifier.height(8.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = expenseAmount,
+            onValueChange = { expenseAmount = it },
+            label = { Text("Expense Amount (£)") },
+            modifier = Modifier.fillMaxWidth()
+        )
 
-            TextField(
-                value = expenseAmount,
-                onValueChange = { expenseAmount = it },
-                label = { Text("Expense Amount (£)") },
-                modifier = Modifier.fillMaxWidth()
-            )
 
-            Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = {
-                    if (expenseName.isNotEmpty() && expenseAmount.isNotEmpty()) {
-                        val amount = expenseAmount.toDoubleOrNull()
-                        if (amount != null) {
-                            val currentDate = System.currentTimeMillis()
-                            val expense = Expense(
-                                name = expenseName,
-                                amount = amount,
-                                date = currentDate.toString()
-                            )
-                            expenseViewModel.addExpense(expense)
-                            Toast.makeText(context, "Expense added successfully", Toast.LENGTH_SHORT).show()
-                            expenseName = ""
-                            expenseAmount = ""
-                        } else {
-                            Toast.makeText(context, "Invalid amount", Toast.LENGTH_SHORT).show()
-                        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                if (expenseName.isNotEmpty() && expenseAmount.isNotEmpty()) {
+                    val amount = expenseAmount.toDoubleOrNull()
+                    if (amount != null) {
+                        val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                        val expense = Expense(
+                            name = expenseName,
+                            amount = amount,
+                            date = currentDate,
+
+                        )
+                        expenseViewModel.addExpense(expense)
+                        Toast.makeText(context, "Expense added successfully", Toast.LENGTH_SHORT).show()
+                        expenseName = ""
+                        expenseAmount = ""
+
                     } else {
-                        Toast.makeText(context, "Fields cannot be empty", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Invalid amount", Toast.LENGTH_SHORT).show()
                     }
-                },
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Text("Add Expense")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text("Expense History", style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(expenses) { expense ->
-                    ExpenseItem(expense)
+                } else {
+                    Toast.makeText(context, "Fields cannot be empty", Toast.LENGTH_SHORT).show()
                 }
+            },
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("Add Expense")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Expense History", style = MaterialTheme.typography.titleLarge)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(expenses) { expense ->
+                ExpenseItem(expense)
             }
         }
     }
+}
 
-    @Composable
+
+@Composable
     fun ExpenseItem(expense: Expense) {
         Card(
             modifier = Modifier.fillMaxWidth(),
