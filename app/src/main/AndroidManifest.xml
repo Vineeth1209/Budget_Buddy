@@ -35,6 +35,8 @@
 
         <activity android:name=".ExpensesActivity" android:exported="true"/>
 
+        <activity android:name=".ConsentActivity" android:exported="true"/>
+
     </application>
 
 </manifest>
